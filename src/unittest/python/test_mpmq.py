@@ -24,6 +24,7 @@ from queue import Empty
 from mpmq.mpmq import MPmq
 from mpmq.mpmq import NoActiveProcesses
 from mpmq.handler import queue_handler
+from mpmq.mpmq import SLEEP_BEFORE_UPDATING_RESULT
 
 import sys
 import logging
@@ -132,7 +133,7 @@ class TestMPmq(unittest.TestCase):
         logger_patch.info.assert_called_once_with('process at offset 0 process id 121372 has completed')
 
     @patch('mpmq.mpmq.sleep')
-    def test__update_result_Should_CallExpected_When_Called(self, *patches):
+    def test__update_result_Should_CallExpected_When_Called(self, sleep_patch, *patches):
         result_queue_mock = Mock()
         result_queue_mock.get.side_effect = [
             {'0': '--result0--'},
@@ -147,6 +148,25 @@ class TestMPmq(unittest.TestCase):
         client.update_result()
         expected_process_data = [{'range': '0-1', 'result': '--result0--'}, {'range': '2-3', 'result': '--result1--'}, {'range': '4-5', 'result': '--result2--'}]
         self.assertEqual(client.process_data, expected_process_data)
+        sleep_patch.assert_called_once_with(SLEEP_BEFORE_UPDATING_RESULT)
+
+    @patch('mpmq.mpmq.sleep')
+    def test__update_result_Should_CallSleep_When_SleepOverride(self, sleep_patch, *patches):
+        result_queue_mock = Mock()
+        result_queue_mock.get.side_effect = [
+            {'0': '--result0--'},
+            {'1': '--result1--'},
+            {'2': '--result2--'},
+            Empty('empty')
+        ]
+        function_mock = Mock(__name__='mockfunc')
+        process_data = [{'range': '0-1'}, {'range': '2-3'}, {'range': '4-5'}]
+        client = MPmq(function=function_mock, process_data=process_data)
+        client.result_queue = result_queue_mock
+        client.update_result(sleep_time=5)
+        expected_process_data = [{'range': '0-1', 'result': '--result0--'}, {'range': '2-3', 'result': '--result1--'}, {'range': '4-5', 'result': '--result2--'}]
+        self.assertEqual(client.process_data, expected_process_data)
+        sleep_patch.assert_called_once_with(5)
 
     def test__active_processes_empty_Should_ReturnExpected_When_Called(self, *patches):
         function_mock = Mock(__name__='mockfunc')
