@@ -26,6 +26,8 @@ from mpmq.handler import QueueHandlerDecorator
 
 logger = logging.getLogger(__name__)
 
+SLEEP_BEFORE_UPDATING_RESULT = .25
+
 
 class NoActiveProcesses(Exception):
     """ Raise when NoActiveProcesses is used to signal end
@@ -119,10 +121,13 @@ class MPmq():
         process_id = process.pid if process else '-'
         logger.info(f'process at offset {offset} process id {process_id} has completed')
 
-    def update_result(self):
+    def update_result(self, sleep_time=None):
         """ update process data with result
         """
-        sleep(.25)
+        logger.debug('updating process data with results')
+        if sleep_time is None:
+            sleep_time = SLEEP_BEFORE_UPDATING_RESULT
+        sleep(sleep_time)
         logger.debug(f'the result queue size is: {self.result_queue.qsize()}')
         logger.debug('updating process data with result from result queue')
         while True:
@@ -181,10 +186,10 @@ class MPmq():
         pass
 
     def run(self):
-        """ run without screen
+        """ start processes and process messages
         """
+        logger.debug('executing run task')
         self.start_processes()
-
         while True:
             try:
                 message = self.get_message()
@@ -203,12 +208,13 @@ class MPmq():
     def execute_run(self):
         """ wraps call to run
         """
+        logger.debug('executing run task wrapper')
         self.run()
 
     def final(self):
         """ called in finally block
         """
-        pass
+        logger.debug('executing final task')
 
     def execute(self):
         """ public execute api
