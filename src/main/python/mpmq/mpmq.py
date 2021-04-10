@@ -216,12 +216,21 @@ class MPmq():
         """
         logger.debug('executing final task')
 
-    def execute(self):
+    def check_result(self):
+        """ raise exception if any result in process data is exception
+        """
+        logger.debug('checking results for errors')
+        if any([isinstance(process.get('result'), Exception) for process in self.process_data]):
+            raise Exception('one or more processes had errors')
+
+    def execute(self, raise_if_error=False):
         """ public execute api
         """
         try:
             self.execute_run()
             self.update_result()
+            if raise_if_error:
+                self.check_result()
 
         except KeyboardInterrupt:
             logger.info('Keyboard Interrupt signal received - killing all active processes')

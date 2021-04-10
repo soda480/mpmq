@@ -342,3 +342,27 @@ class TestMPmq(unittest.TestCase):
         execute_run_patch.assert_called_once_with()
         update_result_patch.assert_called_once_with()
         final_patch.assert_called_once_with()
+
+    @patch('mpmq.MPmq.final')
+    @patch('mpmq.MPmq.update_result')
+    @patch('mpmq.MPmq.execute_run')
+    @patch('mpmq.MPmq.check_result')
+    def test__execute_Should_CallExpected_When_RaiseIfError(self, check_result_patch, *patches):
+        function_mock = Mock(__name__='mockfunc')
+        process_data = [{'range': '0-1'}]
+        client = MPmq(function=function_mock, process_data=process_data)
+        client.execute(raise_if_error=True)
+        check_result_patch.assert_called_once_with()
+
+    def test__check_result_Should_RaiseException_When_ProcessResultException(self, *patches):
+        function_mock = Mock(__name__='mockfunc')
+        process_data = [{}, {}, {}, {'result': ValueError('error')}]
+        client = MPmq(function=function_mock, process_data=process_data)
+        with self.assertRaises(Exception):
+            client.check_result()
+
+    def test__check_result_Should_NotRaiseException_When_NoProcessResultException(self, *patches):
+        function_mock = Mock(__name__='mockfunc')
+        process_data = [{}, {'result': True}, {'result': False}, {'result': True}]
+        client = MPmq(function=function_mock, process_data=process_data)
+        client.check_result()
