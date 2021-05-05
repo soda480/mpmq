@@ -30,7 +30,7 @@ name = 'mpmq'
 authors = [Author('Emilio Reyes', 'emilio.reyes@intel.com')]
 summary = 'Mpmq is an abstraction of the Python multiprocessing library providing execution pooling and message queuing capabilities.'
 url = 'https://github.com/soda480/mpmq'
-version = '0.1.2'
+version = '0.1.3'
 default_task = [
     'clean',
     'analyze',

@@ -16,6 +16,7 @@
 import re
 import sys
 import logging
+import datetime
 from time import sleep
 from multiprocessing import Queue
 from multiprocessing import Process
@@ -57,6 +58,7 @@ class MPmq():
         self.process_queue = SimpleQueue()
         self.completed_processes = 0
         self.processes_to_start = processes_to_start if processes_to_start else len(self.process_data)
+        self.durations = {}
 
     def populate_process_queue(self):
         """ populate process queue from process data offset
@@ -98,14 +100,17 @@ class MPmq():
         process.start()
         logger.info(f'started background process at offset {offset} with process id {process.pid}')
         # update active_processes dictionary with process meta-data for the process offset
-        self.active_processes[str(offset)] = process
+        self.active_processes[str(offset)] = {
+            'process': process,
+            'start_time': datetime.datetime.now()
+        }
 
     def terminate_processes(self):
         """ terminate all active processes
         """
         for offset, process in self.active_processes.items():
-            logger.info(f'terminating process at offset {offset} with process id {process.pid}')
-            process.terminate()
+            logger.info(f"terminating process at offset {offset} with process id {process['process'].pid}")
+            process['process'].terminate()
 
     def purge_process_queue(self):
         """ purge process queue
@@ -114,12 +119,21 @@ class MPmq():
         while not self.process_queue.empty():
             logger.info(f'purged {self.process_queue.get()} from the to process queue')
 
+    def assign_duration(self, offset, start_time):
+        """ calculate duration and assign it to duration
+        """
+        begin_time = start_time.time().strftime('%H:%M:%S')
+        end_time = datetime.datetime.now().time().strftime('%H:%M:%S')
+        self.durations[offset] = str(datetime.datetime.strptime(end_time, '%H:%M:%S') - datetime.datetime.strptime(begin_time, '%H:%M:%S'))
+
     def remove_active_process(self, offset):
         """ remove active process at offset
         """
-        process = self.active_processes.pop(offset, None)
+        process_data = self.active_processes.pop(offset, None)
+        process = process_data['process']
         process_id = process.pid if process else '-'
         logger.info(f'process at offset {offset} process id {process_id} has completed')
+        self.assign_duration(offset, process_data['start_time'])
 
     def update_result(self, sleep_time=None):
         """ update process data with result
