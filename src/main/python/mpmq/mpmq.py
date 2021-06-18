@@ -234,8 +234,12 @@ class MPmq():
         """ raise exception if any result in process data is exception
         """
         logger.debug('checking results for errors')
-        if any([isinstance(process.get('result'), Exception) for process in self.process_data]):
-            raise Exception('one or more processes had errors')
+        errors = []
+        for index, process in enumerate(self.process_data):
+            if isinstance(process.get('result'), Exception):
+                errors.append(str(index))
+        if errors:
+            raise Exception(f"the process at index {','.join(errors)} had errors")
 
     def execute(self, raise_if_error=False):
         """ public execute api
