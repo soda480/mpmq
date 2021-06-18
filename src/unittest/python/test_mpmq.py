@@ -358,7 +358,7 @@ class TestMPmq(unittest.TestCase):
 
     def test__check_result_Should_RaiseException_When_ProcessResultException(self, *patches):
         function_mock = Mock(__name__='mockfunc')
-        process_data = [{}, {}, {}, {'result': ValueError('error')}]
+        process_data = [{}, {'result': ValueError('error')}, {}, {'result': ValueError('error')}]
         client = MPmq(function=function_mock, process_data=process_data)
         with self.assertRaises(Exception):
             client.check_result()
