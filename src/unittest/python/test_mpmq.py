@@ -123,16 +123,19 @@ class TestMPmq(unittest.TestCase):
         client.purge_process_queue()
         self.assertTrue(client.process_queue.empty())
 
-    @patch('mpmq.MPmq.assign_duration')
+    @patch('mpmq.MPmq.get_end_time_duration', return_value=('--end-time--', '--duration--'))
     @patch('mpmq.mpmq.logger')
     def test__remove_active_process_Should_CallExpected_When_Called(self, logger_patch, *patches):
         function_mock = Mock(__name__='mockfunc')
         process_data = [{'range': '0-1'}, {'range': '2-3'}, {'range': '4-5'}]
         client = MPmq(function=function_mock, process_data=process_data)
-        process_mock = Mock(pid=121372)
+        process_mock = Mock(pid=121372, name='Process-1')
+        process_mock.name = 'Process-1'
         client.active_processes['0'] = {'process': process_mock, 'start_time': '--time--'}
         client.remove_active_process('0')
-        logger_patch.info.assert_called_once_with('process at offset 0 process id 121372 has completed')
+        logger_patch.info.assert_called_once_with('process at offset 0 process id 121372 (Process-1) has completed')
+        self.assertEqual(client.durations['0'], '--duration--')
+        self.assertEqual(client.finished_processes['0'], {'process': process_mock, 'start_time': '--time--', 'end_time': '--end-time--', 'duration': '--duration--'})
 
     @patch('mpmq.mpmq.sleep')
     def test__update_result_Should_CallExpected_When_Called(self, sleep_patch, *patches):
@@ -370,7 +373,7 @@ class TestMPmq(unittest.TestCase):
         client.check_result()
 
     @patch('mpmq.mpmq.datetime')
-    def test__assign_duration_Should_CallExpected_When_Called(self, datetime_patch, *patches):
+    def test__get_end_time_duration_Should_CallExpected_When_Called(self, datetime_patch, *patches):
         datetime_patch.datetime.now.return_value = datetime.datetime(2021, 5, 5, 3, 31, 17, 580287)
         # datetime_patch.datetime.strptime.return_value = 1
         datetime_patch.datetime.strptime = datetime.datetime.strptime
@@ -378,5 +381,5 @@ class TestMPmq(unittest.TestCase):
         process_data = [{'range': '0-1'}]
         client = MPmq(function=function_mock, process_data=process_data)
         start_time = datetime.datetime(2021, 5, 5, 3, 29, 18, 24541)
-        client.assign_duration(0, start_time)
-        self.assertEqual(client.durations[0], '0:01:59')
+        result = client.get_end_time_duration(start_time)
+        self.assertEqual(result[1], '0:01:59')
