@@ -84,7 +84,7 @@ Run the Docker container:
 docker container run \
 --rm \
 -it \
--v $PWD:/mpmq \
+-v $PWD:/code \
 mpmq:latest \
 /bin/sh
 ```
