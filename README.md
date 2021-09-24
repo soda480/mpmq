@@ -1,9 +1,9 @@
+# mpmq #
 [![GitHub Workflow Status](https://github.com/soda480/mpmq/workflows/build/badge.svg)](https://github.com/soda480/mpmq/actions)
 [![Code Coverage](https://codecov.io/gh/soda480/mpmq/branch/main/graph/badge.svg?token=SAEJLS4FCM)](https://codecov.io/gh/soda480/mpmq)
 [![Code Grade](https://www.code-inspector.com/project/12270/status/svg)](https://frontend.code-inspector.com/project/12270/dashboard)
 [![PyPI version](https://badge.fury.io/py/mpmq.svg)](https://badge.fury.io/py/mpmq)
-
-# mpmq #
+[![python](https://img.shields.io/badge/python-3.9-teal)](https://www.python.org/downloads/)
 
 Mpmq is an abstraction of the Python multiprocessing library providing execution pooling and message queuing capabilities. Mpmq can scale execution of a specified function across multiple background processes. It creates a log handler that sends all log messages from the running processes to a thread-safe queue. The main process reads the messages off the queue for processing. The number of processes along with the arguments to provide each process is specified as a list of dictionaries. The number of elements in the list will dictate the total number of processes to execute. The result of each function is read from the result queue and written to the respective dictionary element upon completion.
 
