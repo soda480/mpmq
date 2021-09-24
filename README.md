@@ -30,7 +30,10 @@ A simple example using mpmq:
 from mpmq import MPmq
 import sys, logging
 logger = logging.getLogger(__name__)
-logging.basicConfig(stream=sys.stdout, level=logging.INFO, format="%(asctime)s %(processName)s [%(funcName)s] %(levelname)s %(message)s")
+logging.basicConfig(
+    stream=sys.stdout,
+    level=logging.INFO,
+    format="%(asctime)s %(processName)s [%(funcName)s] %(levelname)s %(message)s")
 
 def do_work(*args):
     logger.info(f"hello from process {args[0]['pid']}")
