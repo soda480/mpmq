@@ -27,7 +27,7 @@ from mpmq.handler import QueueHandlerDecorator
 
 logger = logging.getLogger(__name__)
 
-SLEEP_TIME = 5
+TIMEOUT = 3
 
 
 class NoActiveProcesses(Exception):
@@ -45,7 +45,7 @@ class MPmq():
         maintain result of all executed functions
         terminate execution using keyboard interrupt
     """
-    def __init__(self, function, *, process_data=None, shared_data=None, processes_to_start=None):
+    def __init__(self, function, *, process_data=None, shared_data=None, processes_to_start=None, timeout=None):
         """ MPmq constructor
         """
         logger.debug('executing MPmq constructor')
@@ -58,9 +58,7 @@ class MPmq():
         self.result_queue = Queue()
         self.process_queue = SimpleQueue()
         self.processes_to_start = processes_to_start if processes_to_start else len(self.process_data)
-        # deprecated - use finished_processes for durations
-        self.durations = {}
-        self.completed_processes = 0
+        self.timeout = timeout if timeout else TIMEOUT
 
     def populate_process_queue(self):
         """ populate process queue from process data offset
@@ -102,7 +100,7 @@ class MPmq():
         process.start()
         logger.info(f'started background process at offset:{offset} with id:{process.pid} name:{process.name}')
         # update active_processes dictionary with process meta-data for the process offset
-        self.active_processes[str(offset)] = {
+        self.active_processes[offset] = {
             'process': process,
             'start_time': datetime.datetime.now()
         }
@@ -119,7 +117,7 @@ class MPmq():
         """
         for offset, process_data in self.finished_processes.items():
             logger.info(f"joined process at offset:{offset} with id:{process_data['process'].pid} name:{process_data['process'].name}")
-            process_data['process'].join(SLEEP_TIME)
+            process_data['process'].join(self.timeout)
 
     def purge_process_queue(self):
         """ purge process queue
@@ -148,9 +146,6 @@ class MPmq():
         process_data['duration'] = duration
         self.finished_processes[offset] = process_data
 
-        # kept for backwards compatability - will be deprecated in a future release
-        self.durations[offset] = duration
-
     def update_result(self):
         """ update process data with result
         """
@@ -159,10 +154,10 @@ class MPmq():
         logger.debug('updating process data with result from result queue')
         while True:
             try:
-                result_data = self.result_queue.get(True, SLEEP_TIME)
+                result_data = self.result_queue.get(True, self.timeout)
                 for offset, result in result_data.items():
                     logger.debug(f'adding result of process at offset:{offset} to process data')
-                    self.process_data[int(offset)]['result'] = result
+                    self.process_data[offset]['result'] = result
             except Empty:
                 logger.debug('result queue is empty')
                 break
@@ -183,7 +178,7 @@ class MPmq():
         match = re.match(r'^#(?P<offset>\d+)-(?P<control>DONE|ERROR)$', message)
         if match:
             return {
-                'offset': match.group('offset'),
+                'offset': int(match.group('offset')),
                 'control': match.group('control'),
                 'message': message
             }
@@ -244,6 +239,7 @@ class MPmq():
 
     def final(self):
         """ called in finally block
+            to be overriden by child class
         """
         logger.debug('executing final task')
 

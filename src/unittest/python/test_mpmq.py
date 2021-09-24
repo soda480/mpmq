@@ -23,7 +23,7 @@ from queue import Empty
 
 from mpmq.mpmq import MPmq
 from mpmq.mpmq import NoActiveProcesses
-from mpmq.mpmq import SLEEP_TIME
+from mpmq.mpmq import TIMEOUT
 from mpmq.handler import queue_handler
 
 import sys
@@ -117,13 +117,13 @@ class TestMPmq(unittest.TestCase):
     def test__join_processes_Should_CallExpected_When_Called(self, *patches):
         function_mock = Mock(__name__='mockfunc')
         process_data = [{'range': '0-1'}, {'range': '2-3'}, {'range': '4-5'}]
-        client = MPmq(function=function_mock, process_data=process_data, shared_data='--shared-data--')
+        client = MPmq(function=function_mock, process_data=process_data, shared_data='--shared-data--', timeout=1)
         process1_mock = Mock()
         process2_mock = Mock()
         client.finished_processes = {'0': {'process': process1_mock}, '1': {'process': process2_mock}}
         client.join_processes()
-        process1_mock.join.assert_called_once_with(SLEEP_TIME)
-        process2_mock.join.assert_called_once_with(SLEEP_TIME)
+        process1_mock.join.assert_called_once_with(client.timeout)
+        process2_mock.join.assert_called_once_with(client.timeout)
 
     def test__purge_process_queue_Should_PurgeProcessQueue_When_Called(self, *patches):
         function_mock = Mock(__name__='mockfunc')
@@ -146,16 +146,14 @@ class TestMPmq(unittest.TestCase):
         client.active_processes['0'] = {'process': process_mock, 'start_time': '--time--'}
         client.remove_active_process('0')
         logger_patch.info.assert_called_once_with('process at offset:0 id:121372 name:Process-1 has completed')
-        self.assertEqual(client.durations['0'], '--duration--')
         self.assertEqual(client.finished_processes['0'], {'process': process_mock, 'start_time': '--time--', 'end_time': '--end-time--', 'duration': '--duration--'})
-        # logger_patch.warn.assert_called_once_with('process at offset 0 process id 121372 (Process-1) will be terminated')
 
     def test__update_result_Should_CallExpected_When_Called(self, *patches):
         result_queue_mock = Mock()
         result_queue_mock.get.side_effect = [
-            {'0': '--result0--'},
-            {'1': '--result1--'},
-            {'2': '--result2--'},
+            {0: '--result0--'},
+            {1: '--result1--'},
+            {2: '--result2--'},
             Empty('empty')
         ]
         function_mock = Mock(__name__='mockfunc')
@@ -185,7 +183,7 @@ class TestMPmq(unittest.TestCase):
 
         result = client.get_message()
         expected_result = {
-            'offset': '0',
+            'offset': 0,
             'control': 'DONE',
             'message': '#0-DONE'
         }
@@ -201,7 +199,7 @@ class TestMPmq(unittest.TestCase):
 
         result = client.get_message()
         expected_result = {
-            'offset': '3',
+            'offset': 3,
             'control': 'ERROR',
             'message': '#3-ERROR'
         }
