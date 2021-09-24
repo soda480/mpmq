@@ -27,7 +27,7 @@ from mpmq.handler import QueueHandlerDecorator
 
 logger = logging.getLogger(__name__)
 
-SLEEP_BEFORE_UPDATING_RESULT = .25
+SLEEP_TIME = 5
 
 
 class NoActiveProcesses(Exception):
@@ -100,7 +100,7 @@ class MPmq():
                 'offset': offset,
                 'result_queue': self.result_queue})
         process.start()
-        logger.info(f'started background process at offset {offset} with process id {process.pid} ({process.name})')
+        logger.info(f'started background process at offset:{offset} with id:{process.pid} name:{process.name}')
         # update active_processes dictionary with process meta-data for the process offset
         self.active_processes[str(offset)] = {
             'process': process,
@@ -111,8 +111,15 @@ class MPmq():
         """ terminate all active processes
         """
         for offset, process_data in self.active_processes.items():
-            logger.info(f"terminating process at offset {offset} with process id {process_data['process'].pid} ({process_data['process'].name})")
+            logger.info(f"terminating process at offset:{offset} with id:{process_data['process'].pid} name:{process_data['process'].name}")
             process_data['process'].terminate()
+
+    def join_processes(self):
+        """ join processes
+        """
+        for offset, process_data in self.finished_processes.items():
+            logger.info(f"joined process at offset:{offset} with id:{process_data['process'].pid} name:{process_data['process'].name}")
+            process_data['process'].join(SLEEP_TIME)
 
     def purge_process_queue(self):
         """ purge process queue
@@ -134,35 +141,33 @@ class MPmq():
         """
         process_data = self.active_processes.pop(offset, None)
         process = process_data['process']
-        process_id = process.pid if process else '-'
-        process.join()
-        logger.info(f'process at offset {offset} process id {process_id} ({process.name}) has completed')
-        # compute duration and add to durations and finished processes
+        logger.info(f'process at offset:{offset} id:{process.pid} name:{process.name} has completed')
+        # compute duration and add to finished processes
         end_time, duration = self.get_end_time_duration(process_data['start_time'])
         process_data['end_time'] = end_time
         process_data['duration'] = duration
         self.finished_processes[offset] = process_data
+
         # kept for backwards compatability - will be deprecated in a future release
         self.durations[offset] = duration
 
-    def update_result(self, sleep_time=None):
+    def update_result(self):
         """ update process data with result
         """
         logger.debug('updating process data with results')
-        if sleep_time is None:
-            sleep_time = SLEEP_BEFORE_UPDATING_RESULT
-        sleep(sleep_time)
         logger.debug(f'the result queue size is: {self.result_queue.qsize()}')
         logger.debug('updating process data with result from result queue')
         while True:
             try:
-                result_data = self.result_queue.get(False)
+                result_data = self.result_queue.get(True, SLEEP_TIME)
                 for offset, result in result_data.items():
-                    logger.debug(f'adding result of process at offset {offset} to process data')
+                    logger.debug(f'adding result of process at offset:{offset} to process data')
                     self.process_data[int(offset)]['result'] = result
             except Empty:
                 logger.debug('result queue is empty')
                 break
+        # close result queue
+        self.result_queue.close()
 
     def active_processes_empty(self):
         """ return True if active processes is empty else False
@@ -200,7 +205,7 @@ class MPmq():
             else:
                 self.start_next_process()
         else:
-            logger.info(f'error detected for process at offset {offset}')
+            logger.info(f'error detected for process at offset:{offset}')
             self.purge_process_queue()
 
     def process_non_control_message(self, offset, message):
@@ -228,6 +233,8 @@ class MPmq():
 
             except Empty:
                 pass
+        # close message queue
+        self.message_queue.close()
 
     def execute_run(self):
         """ wraps call to run
@@ -257,6 +264,7 @@ class MPmq():
         try:
             self.execute_run()
             self.update_result()
+            self.join_processes()
             if raise_if_error:
                 self.check_result()
 
