@@ -23,17 +23,18 @@ use_plugin('python.install_dependencies')
 use_plugin('python.flake8')
 use_plugin('python.coverage')
 use_plugin('python.distutils')
-use_plugin('pypi:pybuilder_radon', '~=0.1.2')
-use_plugin('pypi:pybuilder_bandit', '~=0.1.3')
+use_plugin('pypi:pybuilder_radon')
+use_plugin('pypi:pybuilder_bandit')
 
 name = 'mpmq'
 authors = [Author('Emilio Reyes', 'emilio.reyes@intel.com')]
 summary = 'Mpmq is an abstraction of the Python multiprocessing library providing execution pooling and message queuing capabilities.'
 url = 'https://github.com/soda480/mpmq'
-version = '0.1.6'
+version = '0.2.0'
 default_task = [
     'clean',
     'analyze',
+    'publish',
     'radon',
     'bandit',
     'package']
@@ -66,7 +67,7 @@ def set_properties(project):
         'License :: OSI Approved :: Apache Software License',
         'Operating System :: POSIX :: Linux',
         'Programming Language :: Python',
-        'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.9',
         'Topic :: Software Development :: Libraries',
         'Topic :: Software Development :: Libraries :: Python Modules',
         'Topic :: System :: Networking',

@@ -57,7 +57,7 @@ def queue_handler(function):
         result_queue = kwargs.pop('result_queue', None)
         result = None
         if message_queue:
-            logger.debug(f"configuring message queue log handler for '{function.__name__}' offset {offset}")
+            logger.debug(f"configuring message queue log handler for '{function.__name__}' offset:{offset}")
             handler = QueueHandler(message_queue, offset)
             log_formatter = logging.Formatter('%(asctime)s %(processName)s %(name)s [%(funcName)s] %(levelname)s %(message)s')
             handler.setFormatter(log_formatter)
@@ -77,11 +77,11 @@ def queue_handler(function):
         finally:
             # add result to result queue with offset index
             if result_queue:
-                logger.debug(f"adding '{function.__name__}' offset {offset} result to result queue")
+                logger.debug(f"adding '{function.__name__}' offset:{offset} result to result queue")
                 result_queue.put({
                     offset: result
                 })
-            logger.debug(f'execution of {function.__name__} offset {offset} ended')
+            logger.debug(f'execution of {function.__name__} offset:{offset} ended')
             # log control message that method completed
             logger.debug('DONE')
             if message_queue:

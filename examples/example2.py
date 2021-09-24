@@ -20,12 +20,12 @@ def get_process_data(count):
 def do_something(*args):
     uuid = args[0]['uuid']
     logger.debug(f'processor id {uuid}')
-    return 'X' * 1000000
+    return 'X' * 100000000
 
 
 def main():
     logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
-    process_data = get_process_data(10)
+    process_data = get_process_data(50)
     mpcon = MPmq(function=do_something, process_data=process_data)
 
     print('Processing...')
