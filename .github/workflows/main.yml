@@ -1,5 +1,7 @@
 name: build
 on:
+  schedule:
+  - cron: "0 8 * * *"
   push:
     branches:
       - '**'
@@ -9,25 +11,21 @@ on:
 jobs:
   build:
     runs-on: ubuntu-20.04
-    container: python:3.9-slim
-
     steps:
     - uses: actions/checkout@v2
 
-    - name: Install pybuilder
-      run: pip install pybuilder
-
-    - name: Execute build
-      run: pyb
-
-    - name: Install Codecov requirements
+    - name: Build Docker image
       run: |
-        apt-get update
-        apt-get install -y bash curl
-        sed -e 's,filename="mpmq/,filename="src/main/python/mpmq/,g' target/reports/mpmq_coverage.xml > coverage.xml
+        docker image build -t mpmq:latest .
+
+    - name: Prepare coverage
+      run: |
+        ID=$(docker create mpmq)
+        docker cp $ID:/code/target/reports/mpmq_coverage.xml mpmq_coverage.xml
+        sed -i -e 's,filename="mpmq/,filename="src/main/python/mpmq/,g' mpmq_coverage.xml
 
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v1
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
-        file: coverage.xml
+        file: mpmq_coverage.xml
