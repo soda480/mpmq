@@ -99,7 +99,7 @@ class TestHandler(unittest.TestCase):
         result_queue_mock = Mock()
         result = queue_handler(function_mock)(offset=3, result_queue=result_queue_mock)
         self.assertEqual(result, function_mock.return_value)
-        result_queue_mock.put.assert_called_once_with({3: function_mock.return_value})
+        result_queue_mock.put.assert_called_once_with({'offset': 3, 'result': function_mock.return_value})
 
     def test__queue_handler_Should_AddDoneToMessageQueue_When_DecoratedFunctionIsPassedMessageQueueAndCompletes(self, *patches):
         function_mock = Mock(__name__='fn1')
@@ -127,7 +127,7 @@ class TestHandler(unittest.TestCase):
         message_queue_mock = Mock()
         result_queue_mock = Mock()
         queue_handler(function_mock)(offset=3, message_queue=message_queue_mock, result_queue=result_queue_mock)
-        result_queue_mock.put.assert_called_once_with({3: function_mock.side_effect})
+        result_queue_mock.put.assert_called_once_with({'offset': 3, 'result': function_mock.side_effect})
 
     @patch('mpmq.handler.Handler')
     def test__QueueHandler_Should_PutInfoMessageToMessageQueue_When_EmitInfoRecord(self, *patches):

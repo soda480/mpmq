@@ -30,7 +30,7 @@ name = 'mpmq'
 authors = [Author('Emilio Reyes', 'emilio.reyes@intel.com')]
 summary = 'Mpmq is an abstraction of the Python multiprocessing library providing execution pooling and message queuing capabilities.'
 url = 'https://github.com/soda480/mpmq'
-version = '0.2.0'
+version = '0.3.0'
 default_task = [
     'clean',
     'analyze',
@@ -52,7 +52,7 @@ def set_properties(project):
     project.set_property('flake8_include_scripts', True)
     project.set_property('flake8_include_test_sources', True)
     project.set_property('flake8_ignore', 'E501, F401, F403, E114, E116')
-    project.build_depends_on_requirements('requirements-build.txt')
+    project.build_depends_on('mock')
     project.depends_on_requirements('requirements.txt')
     project.set_property('distutils_readme_description', True)
     project.set_property('distutils_description_overwrite', True)

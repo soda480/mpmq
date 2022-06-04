@@ -109,21 +109,9 @@ class TestMPmq(unittest.TestCase):
         client = MPmq(function=function_mock, process_data=process_data, shared_data='--shared-data--')
         process1_mock = Mock()
         process2_mock = Mock()
-        client.active_processes = {'0': {'process': process1_mock}, '1': {'process': process2_mock}}
+        client.processes = {'0': {'process': process1_mock, 'active': False}, '1': {'process': process2_mock, 'active': True}}
         client.terminate_processes()
-        process1_mock.terminate.assert_called_once_with()
         process2_mock.terminate.assert_called_once_with()
-
-    def test__join_processes_Should_CallExpected_When_Called(self, *patches):
-        function_mock = Mock(__name__='mockfunc')
-        process_data = [{'range': '0-1'}, {'range': '2-3'}, {'range': '4-5'}]
-        client = MPmq(function=function_mock, process_data=process_data, shared_data='--shared-data--', timeout=1)
-        process1_mock = Mock()
-        process2_mock = Mock()
-        client.finished_processes = {'0': {'process': process1_mock}, '1': {'process': process2_mock}}
-        client.join_processes()
-        process1_mock.join.assert_called_once_with(client.timeout)
-        process2_mock.join.assert_called_once_with(client.timeout)
 
     def test__purge_process_queue_Should_PurgeProcessQueue_When_Called(self, *patches):
         function_mock = Mock(__name__='mockfunc')
@@ -134,44 +122,33 @@ class TestMPmq(unittest.TestCase):
         client.purge_process_queue()
         self.assertTrue(client.process_queue.empty())
 
-    @patch('mpmq.MPmq.get_end_time_duration', return_value=('--end-time--', '--duration--'))
-    @patch('mpmq.mpmq.logger')
-    def test__remove_active_process_Should_CallExpected_When_Called(self, logger_patch, *patches):
+    @patch('mpmq.mpmq.datetime')
+    @patch('mpmq.MPmq.get_duration')
+    def test__complete_process_Should_CallExpected_When_Called(self, get_duration_patch, datetime_patch, *patches):
         function_mock = Mock(__name__='mockfunc')
         process_data = [{'range': '0-1'}, {'range': '2-3'}, {'range': '4-5'}]
         client = MPmq(function=function_mock, process_data=process_data)
         process_mock = Mock(pid=121372, name='Process-1')
         process_mock.name = 'Process-1'
-        process_mock.is_alive.return_value = True
-        client.active_processes['0'] = {'process': process_mock, 'start_time': '--time--'}
-        client.remove_active_process('0')
-        logger_patch.info.assert_called_once_with('process at offset:0 id:121372 name:Process-1 has completed')
-        self.assertEqual(client.finished_processes['0'], {'process': process_mock, 'start_time': '--time--', 'end_time': '--end-time--', 'duration': '--duration--'})
+        client.processes['0'] = {'process': process_mock, 'start_time': '--time--', 'stop_time': None, 'duration': None, 'active': True}
+        client.complete_process('0')
+        self.assertEqual(client.processes['0'], {'process': process_mock, 'start_time': '--time--', 'stop_time': datetime_patch.datetime.now.return_value, 'duration': get_duration_patch.return_value, 'active': False})
 
-    def test__update_result_Should_CallExpected_When_Called(self, *patches):
+    def test__get_results_Should_CallExpected_When_Called(self, *patches):
         result_queue_mock = Mock()
         result_queue_mock.get.side_effect = [
-            {0: '--result0--'},
-            {1: '--result1--'},
-            {2: '--result2--'},
+            {'offset': 0, 'result': '--result0--'},
+            {'offset': 1, 'result': '--result1--'},
+            {'offset': 2, 'result': '--result2--'},
             Empty('empty')
         ]
         function_mock = Mock(__name__='mockfunc')
         process_data = [{'range': '0-1'}, {'range': '2-3'}, {'range': '4-5'}]
         client = MPmq(function=function_mock, process_data=process_data)
         client.result_queue = result_queue_mock
-        client.update_result()
-        expected_process_data = [{'range': '0-1', 'result': '--result0--'}, {'range': '2-3', 'result': '--result1--'}, {'range': '4-5', 'result': '--result2--'}]
-        self.assertEqual(client.process_data, expected_process_data)
-
-    def test__active_processes_empty_Should_ReturnExpected_When_Called(self, *patches):
-        function_mock = Mock(__name__='mockfunc')
-        process_data = [{'range': '0-1'}]
-        client = MPmq(function=function_mock, process_data=process_data)
-        client.active_processes = {'1': True}
-        self.assertFalse(client.active_processes_empty())
-        client.active_processes = {}
-        self.assertTrue(client.active_processes_empty())
+        results = client.get_results()
+        expected_results = ['--result0--', '--result1--', '--result2--']
+        self.assertEqual(results, expected_results)
 
     def test__get_message_Should_ReturnExpected_When_ControlDone(self, *patches):
         process_data = [{'range': '0-1'}]
@@ -221,8 +198,7 @@ class TestMPmq(unittest.TestCase):
         }
         self.assertEqual(result, expected_result)
 
-    @patch('mpmq.MPmq.remove_active_process')
-    @patch('mpmq.MPmq.active_processes_empty', return_value=True)
+    @patch('mpmq.MPmq.complete_process')
     def test__process_control_message_Should_RaiseNoActiveProcesses_When_ControlDoneAndProcessQueueEmptyAndNoActiveProcesses(self, *patches):
         process_data = [{'range': '0-1'}]
         client = MPmq(function=Mock(__name__='mockfunc'), process_data=process_data)
@@ -234,10 +210,9 @@ class TestMPmq(unittest.TestCase):
         with self.assertRaises(NoActiveProcesses):
             client.process_control_message('0', 'DONE')
 
-    @patch('mpmq.MPmq.active_processes_empty', return_value=False)
-    @patch('mpmq.MPmq.remove_active_process')
+    @patch('mpmq.MPmq.complete_process')
     @patch('mpmq.MPmq.start_next_process')
-    def test__process_control_message_Should_StartNextProcess_When_ControlDoneAndProcessQueueNotEmpty(self, start_next_process_patch, remove_active_process_patch, *patches):
+    def test__process_control_message_Should_StartNextProcess_When_ControlDoneAndProcessQueueNotEmpty(self, start_next_process_patch, complete_process_patch, *patches):
         process_data = [{'range': '0-1'}]
         client = MPmq(function=Mock(__name__='mockfunc'), process_data=process_data)
 
@@ -247,7 +222,7 @@ class TestMPmq(unittest.TestCase):
 
         client.process_control_message('0', 'DONE')
         start_next_process_patch.assert_called_once_with()
-        remove_active_process_patch.assert_called_once_with('0')
+        complete_process_patch.assert_called_once_with('0')
 
     @patch('mpmq.MPmq.purge_process_queue')
     def test__process_control_message_Should_PurgeProcessQueue_When_ControlError(self, purge_process_queue_patch, *patches):
@@ -257,8 +232,7 @@ class TestMPmq(unittest.TestCase):
         client.process_control_message('0', 'ERROR')
         purge_process_queue_patch.assert_called_once_with()
 
-    @patch('mpmq.MPmq.remove_active_process')
-    @patch('mpmq.MPmq.active_processes_empty', return_value=False)
+    @patch('mpmq.MPmq.complete_process')
     def test__process_control_message_Should_DoNothing_When_ControlDoneAndProcessQueueEmptyAndActiveProcesses(self, *patches):
         process_data = [{'range': '0-1'}]
         client = MPmq(function=Mock(__name__='mockfunc'), process_data=process_data)
@@ -266,13 +240,13 @@ class TestMPmq(unittest.TestCase):
         process_queue_mock = Mock()
         process_queue_mock.empty.return_value = True
         client.process_queue = process_queue_mock
-
+        client.processes = {'0': {'active': True}}
         client.process_control_message('0', 'DONE')
 
-    def test__process_non_control_message_Should_DoNothing_When_Called(self, *patches):
+    def test__process_message_Should_DoNothing_When_Called(self, *patches):
         process_data = [{'range': '0-1'}]
         client = MPmq(function=Mock(__name__='mockfunc'), process_data=process_data)
-        client.process_non_control_message(None, 'message')
+        client.process_message(None, 'message')
 
     @patch('mpmq.MPmq.start_processes')
     @patch('mpmq.mpmq.logger')
@@ -289,10 +263,10 @@ class TestMPmq(unittest.TestCase):
         logger_patch.info.assert_called_once_with('there are no more active processses - quitting')
 
     @patch('mpmq.MPmq.start_processes')
-    @patch('mpmq.MPmq.process_non_control_message')
+    @patch('mpmq.MPmq.process_message')
     @patch('mpmq.MPmq.process_control_message')
     @patch('mpmq.MPmq.get_message')
-    def test__run_Should_CallExpected_When_Called(self, get_message_patch, process_control_message_patch, process_non_control_message_patch, *patches):
+    def test__run_Should_CallExpected_When_Called(self, get_message_patch, process_control_message_patch, process_message_patch, *patches):
         process_data = [{'range': '0-1'}]
         client = MPmq(function=Mock(__name__='mockfunc'), process_data=process_data)
 
@@ -304,9 +278,8 @@ class TestMPmq(unittest.TestCase):
         ]
         client.run()
         process_control_message_patch.assert_called_once_with('0', 'DONE')
-        self.assertTrue(call(None, '#0-this is message1') in process_non_control_message_patch.mock_calls)
+        self.assertTrue(call(None, '#0-this is message1') in process_message_patch.mock_calls)
 
-    @patch('mpmq.MPmq.join_processes')
     @patch('mpmq.MPmq.run')
     def test__execute_run_Should_CallExepcted_When_Called(self, run_patch, *patches):
         process_data = [{'range': '0-1'}]
@@ -314,7 +287,6 @@ class TestMPmq(unittest.TestCase):
         client.execute_run()
         run_patch.assert_called_once_with()
 
-    @patch('mpmq.MPmq.join_processes')
     @patch('mpmq.MPmq.terminate_processes')
     @patch('mpmq.mpmq.sys')
     @patch('mpmq.MPmq.execute_run')
@@ -330,51 +302,51 @@ class TestMPmq(unittest.TestCase):
         sys_patch.exit.assert_called_once_with(-1)
 
     @patch('mpmq.MPmq.final')
-    @patch('mpmq.MPmq.join_processes')
-    @patch('mpmq.MPmq.update_result')
+    @patch('mpmq.MPmq.get_results')
     @patch('mpmq.MPmq.execute_run')
-    def test__execute_Should_CallExpected_When_Called(self, execute_run_patch, update_result_patch, final_patch, *patches):
+    def test__execute_Should_CallExpected_When_Called(self, execute_run_patch, get_results_patch, final_patch, *patches):
         function_mock = Mock(__name__='mockfunc')
         process_data = [{'range': '0-1'}]
         client = MPmq(function=function_mock, process_data=process_data)
         client.execute()
         execute_run_patch.assert_called_once_with()
-        update_result_patch.assert_called_once_with()
+        get_results_patch.assert_called_once_with()
+        final_patch.assert_called_once_with()
+
+    @patch('mpmq.mpmq.logger')
+    @patch('mpmq.MPmq.final')
+    @patch('mpmq.MPmq.execute_run')
+    def test__execute_Should_LogExceptionAndReturnResults_When_Exception(self, execute_run_patch, final_patch, logger_patch, *patches):
+        execute_run_patch.side_effect = Exception('something very bad happened')
+        function_mock = Mock(__name__='mockfunc')
+        process_data = [{'range': '0-1'}]
+        client = MPmq(function=function_mock, process_data=process_data)
+        client.execute()
+        logger_patch.error.assert_called_once()
         final_patch.assert_called_once_with()
 
     @patch('mpmq.MPmq.final')
-    @patch('mpmq.MPmq.join_processes')
-    @patch('mpmq.MPmq.update_result')
     @patch('mpmq.MPmq.execute_run')
-    @patch('mpmq.MPmq.check_result')
-    def test__execute_Should_CallExpected_When_RaiseIfError(self, check_result_patch, *patches):
+    @patch('mpmq.MPmq.get_results')
+    @patch('mpmq.MPmq.check_results')
+    def test__execute_Should_CallExpected_When_RaiseIfError(self, check_results_patch, get_results_patch, *patches):
         function_mock = Mock(__name__='mockfunc')
         process_data = [{'range': '0-1'}]
         client = MPmq(function=function_mock, process_data=process_data)
         client.execute(raise_if_error=True)
-        check_result_patch.assert_called_once_with()
+        check_results_patch.assert_called_once_with(get_results_patch.return_value)
 
-    def test__check_result_Should_RaiseException_When_ProcessResultException(self, *patches):
-        function_mock = Mock(__name__='mockfunc')
-        process_data = [{}, {'result': ValueError('error')}, {}, {'result': ValueError('error')}]
-        client = MPmq(function=function_mock, process_data=process_data)
+    def test__check_results_Should_RaiseException_When_ProcessResultException(self, *patches):
+        results = [{}, ValueError('error'), {}, ValueError('error')]
         with self.assertRaises(Exception):
-            client.check_result()
+            MPmq.check_results(results)
 
-    def test__check_result_Should_NotRaiseException_When_NoProcessResultException(self, *patches):
-        function_mock = Mock(__name__='mockfunc')
-        process_data = [{}, {'result': True}, {'result': False}, {'result': True}]
-        client = MPmq(function=function_mock, process_data=process_data)
-        client.check_result()
+    def test__check_results_Should_NotRaiseException_When_NoProcessResultException(self, *patches):
+        results = [{}, {'result': True}, {'result': False}, {'result': True}]
+        MPmq.check_results(results)
 
-    @patch('mpmq.mpmq.datetime')
-    def test__get_end_time_duration_Should_CallExpected_When_Called(self, datetime_patch, *patches):
-        datetime_patch.datetime.now.return_value = datetime.datetime(2021, 5, 5, 3, 31, 17, 580287)
-        # datetime_patch.datetime.strptime.return_value = 1
-        datetime_patch.datetime.strptime = datetime.datetime.strptime
-        function_mock = Mock(__name__='mockfunc')
-        process_data = [{'range': '0-1'}]
-        client = MPmq(function=function_mock, process_data=process_data)
+    def test__get_duration_Should_CallExpected_When_Called(self, *patches):
+        stop_time = datetime.datetime(2021, 5, 5, 3, 31, 17, 580287)
         start_time = datetime.datetime(2021, 5, 5, 3, 29, 18, 24541)
-        result = client.get_end_time_duration(start_time)
-        self.assertEqual(result[1], '0:01:59')
+        result = MPmq.get_duration(start_time, stop_time)
+        self.assertEqual(result, '0:01:59')
