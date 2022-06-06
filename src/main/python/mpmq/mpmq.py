@@ -37,13 +37,14 @@ class NoActiveProcesses(Exception):
 
 
 class MPmq():
-    """ multi-processing (MP) message queue controller
-        execute function across multiple processes
-        queue function execution
-        queue function log messages to thread-safe message queue
-        process messages from log message queue
-        maintain result of all executed functions
-        terminate execution using keyboard interrupt
+    """ The mpmq module provides a convenient way to scale execution of a function across multiple input values by
+        distributing the input across a specified number of background processes. It also provides the means for the
+        caller to intercept and process messages from the background processes while they execute the function.
+        It does this by configuring a custom log handler that sends the function's log messages to a thread-safe queue;
+        several API's are provided for the caller to process the messages from the message queue. The number of
+        processes along with the input data for each process is specified as a list of dictionaries. The number of
+        elements in the list dictates the total number of processes to execute. The result of each function is returned
+        as a list to the caller after all background workers complete.
     """
     def __init__(self, function, *, process_data=None, shared_data=None, processes_to_start=None, timeout=None):
         """ MPmq constructor
@@ -52,8 +53,7 @@ class MPmq():
         self.function = QueueHandlerDecorator(function)
         self.process_data = [{}] if process_data is None else process_data
         self.shared_data = {} if shared_data is None else shared_data
-        self.active_processes = {}
-        self.finished_processes = {}
+        self.processes = {}
         self.message_queue = Queue()
         self.result_queue = Queue()
         self.process_queue = SimpleQueue()
@@ -82,14 +82,13 @@ class MPmq():
                 logger.debug('the process queue is empty - no more processes need to be started')
                 break
             self.start_next_process()
-        logger.info(f'started {len(self.active_processes)} background processes')
+        active_processes = sum(meta['active'] for _, meta in self.processes.items())
+        logger.info(f'started {active_processes} background processes')
 
     def start_next_process(self):
         """ start next process in the process queue
         """
-        process_queue_data = self.process_queue.get()
-        offset = process_queue_data[0]
-        process_data = process_queue_data[1]
+        (offset, process_data) = self.process_queue.get()
         process = Process(
             target=self.function,
             args=(process_data, self.shared_data),
@@ -99,25 +98,25 @@ class MPmq():
                 'result_queue': self.result_queue})
         process.start()
         logger.info(f'started background process at offset:{offset} with id:{process.pid} name:{process.name}')
-        # update active_processes dictionary with process meta-data for the process offset
-        self.active_processes[offset] = {
+        # update processes dictionary with process meta-data for the process at offset
+        self.processes[offset] = {
             'process': process,
-            'start_time': datetime.datetime.now()
+            'start_time': datetime.datetime.now(),
+            'stop_time': None,
+            'duration': None,
+            'active': True
         }
 
     def terminate_processes(self):
         """ terminate all active processes
         """
-        for offset, process_data in self.active_processes.items():
-            logger.info(f"terminating process at offset:{offset} with id:{process_data['process'].pid} name:{process_data['process'].name}")
-            process_data['process'].terminate()
-
-    def join_processes(self):
-        """ join processes
-        """
-        for offset, process_data in self.finished_processes.items():
-            logger.info(f"joined process at offset:{offset} with id:{process_data['process'].pid} name:{process_data['process'].name}")
-            process_data['process'].join(self.timeout)
+        for offset, meta in self.processes.items():
+            process = meta['process']
+            if not meta['active']:
+                continue
+            logger.info(f"terminating process at offset:{offset} with id:{process.pid} name:{process.name}")
+            process.terminate()
+            meta['active'] = False
 
     def purge_process_queue(self):
         """ purge process queue
@@ -126,50 +125,45 @@ class MPmq():
         while not self.process_queue.empty():
             logger.info(f'purged {self.process_queue.get()} from the to process queue')
 
-    def get_end_time_duration(self, start_time):
-        """ return tuple of end_time and duration based off start_time
+    @staticmethod
+    def get_duration(start_time, stop_time):
+        """ return duartion based off start_time and stop_time
         """
-        begin_time = start_time.time().strftime('%H:%M:%S')
-        end_time = datetime.datetime.now().time().strftime('%H:%M:%S')
-        duration = str(datetime.datetime.strptime(end_time, '%H:%M:%S') - datetime.datetime.strptime(begin_time, '%H:%M:%S'))
-        return end_time, duration
+        start = start_time.time().strftime('%H:%M:%S')
+        stop = stop_time.time().strftime('%H:%M:%S')
+        duration = str(datetime.datetime.strptime(stop, '%H:%M:%S') - datetime.datetime.strptime(start, '%H:%M:%S'))
+        return duration
 
-    def remove_active_process(self, offset):
-        """ remove active process at offset
+    def complete_process(self, offset):
+        """ complete the process at offset
         """
-        process_data = self.active_processes.pop(offset, None)
-        process = process_data['process']
+        meta = self.processes[offset]
+        process = meta['process']
         logger.info(f'process at offset:{offset} id:{process.pid} name:{process.name} has completed')
-        # compute duration and add to finished processes
-        end_time, duration = self.get_end_time_duration(process_data['start_time'])
-        process_data['end_time'] = end_time
-        process_data['duration'] = duration
-        self.finished_processes[offset] = process_data
+        meta['stop_time'] = datetime.datetime.now()
+        meta['duration'] = self.get_duration(meta['start_time'], meta['stop_time'])
+        logger.info(f"joining process at offset:{offset} with id:{process.pid} name:{process.name}")
+        process.join(self.timeout)
+        meta['active'] = False
 
-    def update_result(self):
-        """ update process data with result
+    def get_results(self):
+        """ return results of function execution from all processes
         """
-        logger.debug('updating process data with results')
+        logger.debug('getting results from all processes using the result queue')
         logger.debug(f'the result queue size is: {self.result_queue.qsize()}')
-        logger.debug('updating process data with result from result queue')
+        results = []
         while True:
             try:
                 result_data = self.result_queue.get(True, self.timeout)
-                for offset, result in result_data.items():
-                    logger.debug(f'adding result of process at offset:{offset} to process data')
-                    self.process_data[offset]['result'] = result
+                offset = result_data['offset']
+                result = result_data['result']
+                logger.debug(f'adding result of process at offset:{offset} to results')
+                results.insert(offset, result)
             except Empty:
-                logger.debug('result queue is empty')
+                logger.debug('the result queue is now empty')
                 break
-        # close result queue
         self.result_queue.close()
-
-    def active_processes_empty(self):
-        """ return True if active processes is empty else False
-            method added to facilitate unit testing
-        """
-        # no active processes means its empty
-        return not self.active_processes
+        return results
 
     def get_message(self):
         """ return message from top of message queue
@@ -192,19 +186,21 @@ class MPmq():
         """ process control message
         """
         if control == 'DONE':
-            self.remove_active_process(offset)
+            self.complete_process(offset)
             if self.process_queue.empty():
                 logger.info('the to process queue is empty')
-                if self.active_processes_empty():
+                active_processes = sum(meta['active'] for _, meta in self.processes.items())
+                if not active_processes:
                     raise NoActiveProcesses()
+                logger.debug(f'there are {active_processes} background processes still alive')
             else:
                 self.start_next_process()
         else:
             logger.info(f'error detected for process at offset:{offset}')
             self.purge_process_queue()
 
-    def process_non_control_message(self, offset, message):
-        """ process non-control message
+    def process_message(self, offset, message):
+        """ process message
             to be overriden by child class
         """
         pass
@@ -220,7 +216,7 @@ class MPmq():
                 if message['control']:
                     self.process_control_message(message['offset'], message['control'])
                 else:
-                    self.process_non_control_message(message['offset'], message['message'])
+                    self.process_message(message['offset'], message['message'])
 
             except NoActiveProcesses:
                 logger.info('there are no more active processses - quitting')
@@ -228,7 +224,6 @@ class MPmq():
 
             except Empty:
                 pass
-        # close message queue
         self.message_queue.close()
 
     def execute_run(self):
@@ -243,26 +238,30 @@ class MPmq():
         """
         logger.debug('executing final task')
 
-    def check_result(self):
-        """ raise exception if any result in process data is exception
+    @staticmethod
+    def check_results(results):
+        """ raise exception if any result is exception
         """
         logger.debug('checking results for errors')
         errors = []
-        for index, process in enumerate(self.process_data):
-            if isinstance(process.get('result'), Exception):
-                errors.append(str(index))
+        for offset, result in enumerate(results):
+            if isinstance(result, Exception):
+                errors.append(str(offset))
         if errors:
-            raise Exception(f"the process at index {','.join(errors)} had errors")
+            raise Exception(f"the process at offset {', '.join(errors)} had errors")
 
     def execute(self, raise_if_error=False):
         """ public execute api
         """
         try:
             self.execute_run()
-            self.update_result()
-            self.join_processes()
+            results = self.get_results()
             if raise_if_error:
-                self.check_result()
+                self.check_results(results)
+            return results
+
+        except Exception as exception:
+            logger.error(exception)
 
         except KeyboardInterrupt:
             logger.info('Keyboard Interrupt signal received - killing all active processes')

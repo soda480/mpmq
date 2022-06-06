@@ -79,7 +79,8 @@ def queue_handler(function):
             if result_queue:
                 logger.debug(f"adding '{function.__name__}' offset:{offset} result to result queue")
                 result_queue.put({
-                    offset: result
+                    'offset': offset,
+                    'result': result
                 })
             logger.debug(f'execution of {function.__name__} offset:{offset} ended')
             # log control message that method completed

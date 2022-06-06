@@ -26,12 +26,12 @@ def do_something(*args):
 def main():
     logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
     process_data = get_process_data(50)
-    mpcon = MPmq(function=do_something, process_data=process_data)
+    mpq = MPmq(function=do_something, process_data=process_data)
 
     print('Processing...')
-    mpcon.execute(raise_if_error=True)
-    for item in process_data:
-        print(len(item['result']))
+    results = mpq.execute(raise_if_error=True)
+    for result in results:
+        print(len(result))
 
 
 if __name__ == '__main__':
