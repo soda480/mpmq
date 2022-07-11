@@ -30,7 +30,7 @@ name = 'mpmq'
 authors = [Author('Emilio Reyes', 'emilio.reyes@intel.com')]
 summary = 'Mpmq is an abstraction of the Python multiprocessing library providing execution pooling and message queuing capabilities.'
 url = 'https://github.com/soda480/mpmq'
-version = '0.3.0'
+version = '0.3.1'
 default_task = [
     'clean',
     'analyze',
@@ -67,10 +67,10 @@ def set_properties(project):
         'License :: OSI Approved :: Apache Software License',
         'Operating System :: POSIX :: Linux',
         'Programming Language :: Python',
-        'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',
         'Programming Language :: Python :: 3.9',
+        'Programming Language :: Python :: 3.10',
         'Topic :: Software Development :: Libraries',
         'Topic :: Software Development :: Libraries :: Python Modules',
         'Topic :: System :: Networking',
@@ -79,4 +79,3 @@ def set_properties(project):
     project.set_property('radon_break_build_complexity_threshold', 14)
     project.set_property('bandit_break_build', True)
     project.set_property('anybadge_exclude', 'coverage, complexity')
-    project.set_property('anybadge_use_shields', True)
