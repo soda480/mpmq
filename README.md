@@ -1,10 +1,10 @@
-# mpmq #
+# mpmq
 [![GitHub Workflow Status](https://github.com/soda480/mpmq/workflows/build/badge.svg)](https://github.com/soda480/mpmq/actions)
 [![Code Coverage](https://codecov.io/gh/soda480/mpmq/branch/main/graph/badge.svg?token=SAEJLS4FCM)](https://codecov.io/gh/soda480/mpmq)
 [![Code Grade](https://api.codiga.io/project/20847/status/svg)](https://app.codiga.io/public/project/20847/mpmq/dashboard)
 [![vulnerabilities](https://img.shields.io/badge/vulnerabilities-None-brightgreen)](https://pypi.org/project/bandit/)
 [![PyPI version](https://badge.fury.io/py/mpmq.svg)](https://badge.fury.io/py/mpmq)
-[![python](https://img.shields.io/badge/python-3.9-teal)](https://www.python.org/downloads/)
+[![python](https://img.shields.io/badge/python-3.7%20%7C%203.8%20%7C%203.9%20%7C%203.10-teal)](https://www.python.org/downloads/)
 
 The mpmq module provides a convenient way to scale execution of a function across multiple input values by distributing the input across a specified number of background processes. It also provides the means for the caller to intercept and process messages from the background processes while they execute the function. It does this by configuring a custom log handler that sends the function's log messages to a thread-safe queue; several API's are provided for the caller to process the messages from the message queue. The number of processes along with the input data for each process is specified as a list of dictionaries. The number of elements in the list dictates the total number of processes to execute. The result of each function is returned as a list to the caller after all background workers complete.
 
@@ -17,12 +17,12 @@ The main features are:
 * maintain result of all executed functions
 * terminate execution using keyboard interrupt
 
-### Installation ###
+### Installation
 ```bash
 pip install mpmq
 ```
 
-### `MPmq class` ###
+### `MPmq class`
 ```
 mpmq.MPmq(function, process_data=None, shared_data=None, processes_to_start=None)
 ```
@@ -41,7 +41,7 @@ number then execution will be queued and executed to ensure that this concurrenc
 > **process_message(offset, message)**
 >> Process a message sent from one of the background processes executing the function. The `offset` represents the index of the executing Process; this number is the same as the corresponding index within the `process_data` list that was sent to the constructor. The `message` represents the message that was logged by the function.
 
-### Examples ###
+### Examples
 
 A simple example using mpmq:
 
@@ -93,13 +93,15 @@ MainProcess [run] INFO there are no more active processses - quitting
 Total items processed 33
 ```
 
-### Projects using `mpmq` ###
+### Projects using `mpmq`
 
 * [`mpcurses`](https://pypi.org/project/mpcurses/) An abstraction of the Python curses and multiprocessing libraries providing function execution and runtime visualization capabilities
 
-* [`mp4ansi`](https://pypi.org/project/mp4ansi/) A simple ANSI-based terminal emulator that provides multi-processing capabilities.
+* [`mppbars`](https://pypi.org/project/mppbar/) Scale execution of a function across multiple across a number of background processes while displaying their execution status via a progress bar
 
-### Development ###
+* [`mp4ansi`](https://pypi.org/project/mp4ansi/) A simple ANSI-based terminal emulator that provides multi-processing capabilities
+
+### Development
 
 Clone the repository and ensure the latest version of Docker is installed on your development server.
 
@@ -117,7 +119,7 @@ docker container run \
 -it \
 -v $PWD:/code \
 mpmq:latest \
-/bin/bash
+bash
 ```
 
 Execute the build:
