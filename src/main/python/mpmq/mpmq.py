@@ -260,9 +260,6 @@ class MPmq():
                 self.check_results(results)
             return results
 
-        except Exception as exception:
-            logger.error(exception)
-
         except KeyboardInterrupt:
             logger.info('Keyboard Interrupt signal received - killing all active processes')
             self.terminate_processes()
