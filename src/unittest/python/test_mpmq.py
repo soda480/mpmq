@@ -313,6 +313,7 @@ class TestMPmq(unittest.TestCase):
         get_results_patch.assert_called_once_with()
         final_patch.assert_called_once_with()
 
+    @unittest.skip('not needed will be removed in the future - passing exceptions through to caller')
     @patch('mpmq.mpmq.logger')
     @patch('mpmq.MPmq.final')
     @patch('mpmq.MPmq.execute_run')
