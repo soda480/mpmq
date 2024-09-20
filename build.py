@@ -53,29 +53,15 @@ def set_properties(project):
     project.set_property('flake8_include_test_sources', True)
     project.set_property('flake8_ignore', 'E501, F401, F403, E114, E116')
     project.build_depends_on('mock')
-    project.depends_on_requirements('requirements.txt')
     project.set_property('distutils_readme_description', True)
     project.set_property('distutils_description_overwrite', True)
     project.set_property('distutils_upload_skip_existing', True)
     project.set_property('distutils_classifiers', [
-        'Development Status :: 4 - Beta',
-        'Environment :: Console',
-        'Environment :: Console :: Curses',
-        'Environment :: Other Environment',
-        'Intended Audience :: Developers',
-        'Intended Audience :: System Administrators',
-        'License :: OSI Approved :: Apache Software License',
-        'Operating System :: POSIX :: Linux',
         'Programming Language :: Python',
         'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',
         'Programming Language :: Python :: 3.9',
-        'Programming Language :: Python :: 3.10',
-        'Topic :: Software Development :: Libraries',
-        'Topic :: Software Development :: Libraries :: Python Modules',
-        'Topic :: System :: Networking',
-        'Topic :: System :: Systems Administration'])
+        'Programming Language :: Python :: 3.10'])
     project.set_property('radon_break_build_average_complexity_threshold', 3.6)
     project.set_property('radon_break_build_complexity_threshold', 14)
     project.set_property('bandit_break_build', True)
-    project.set_property('anybadge_exclude', 'coverage, complexity')
