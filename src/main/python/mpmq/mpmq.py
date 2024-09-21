@@ -59,6 +59,8 @@ class MPmq():
         self.process_queue = SimpleQueue()
         self.processes_to_start = processes_to_start if processes_to_start else len(self.process_data)
         self.timeout = timeout if timeout else TIMEOUT
+        self.active_processes = 0
+        self.completed_processes = 0
 
     def populate_process_queue(self):
         """ populate process queue from process data offset
@@ -82,8 +84,10 @@ class MPmq():
                 logger.debug('the process queue is empty - no more processes need to be started')
                 break
             self.start_next_process()
-        active_processes = sum(meta['active'] for _, meta in self.processes.items())
-        logger.info(f'started {active_processes} background processes')
+        logger.info(f'started {self.active_processes} background processes')
+
+    def on_start_process(self):
+        pass
 
     def start_next_process(self):
         """ start next process in the process queue
@@ -103,20 +107,21 @@ class MPmq():
             'process': process,
             'start_time': datetime.datetime.now(),
             'stop_time': None,
-            'duration': None,
-            'active': True
+            'duration': None
         }
+        self.active_processes += 1
+        self.on_start_process()
 
     def terminate_processes(self):
         """ terminate all active processes
         """
         for offset, meta in self.processes.items():
             process = meta['process']
-            if not meta['active']:
+            if not meta['process'].is_alive():
                 continue
             logger.info(f"terminating process at offset:{offset} with id:{process.pid} name:{process.name}")
             process.terminate()
-            meta['active'] = False
+        self.active_processes = 0
 
     def purge_process_queue(self):
         """ purge process queue
@@ -134,6 +139,9 @@ class MPmq():
         duration = str(datetime.datetime.strptime(stop, '%H:%M:%S') - datetime.datetime.strptime(start, '%H:%M:%S'))
         return duration
 
+    def on_complete_process(self):
+        pass
+
     def complete_process(self, offset):
         """ complete the process at offset
         """
@@ -144,7 +152,9 @@ class MPmq():
         meta['duration'] = self.get_duration(meta['start_time'], meta['stop_time'])
         logger.info(f"joining process at offset:{offset} with id:{process.pid} name:{process.name}")
         process.join(self.timeout)
-        meta['active'] = False
+        self.active_processes -= 1
+        self.completed_processes += 1
+        self.on_complete_process()
 
     def get_results(self):
         """ return results of function execution from all processes
