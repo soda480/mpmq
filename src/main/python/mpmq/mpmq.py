@@ -199,10 +199,9 @@ class MPmq():
             self.complete_process(offset)
             if self.process_queue.empty():
                 logger.info('the to process queue is empty')
-                active_processes = sum(meta['active'] for _, meta in self.processes.items())
-                if not active_processes:
+                if not self.active_processes:
                     raise NoActiveProcesses()
-                logger.debug(f'there are {active_processes} background processes still alive')
+                logger.debug(f'there are {self.active_processes} background processes still alive')
             else:
                 self.start_next_process()
         else:
