@@ -180,15 +180,14 @@ class MPmq():
         """
         message = self.message_queue.get(False)
         match = re.match(r'^#(?P<offset>\d+)-(?P<control>DONE|ERROR)$', message)
+        offset = None
+        control = None
         if match:
-            return {
-                'offset': int(match.group('offset')),
-                'control': match.group('control'),
-                'message': message
-            }
+            offset = int(match.group('offset'))
+            control = match.group('control')
         return {
-            'offset': None,
-            'control': None,
+            'offset': offset,
+            'control': control,
             'message': message
         }
 

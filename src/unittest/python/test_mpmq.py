@@ -240,7 +240,7 @@ class TestMPmq(unittest.TestCase):
     def test__process_control_message_Should_DoNothing_When_ControlDoneAndProcessQueueEmptyAndActiveProcesses(self, *patches):
         process_data = [{'range': '0-1'}]
         client = MPmq(function=Mock(__name__='mockfunc'), process_data=process_data)
-
+        client.active_processes = 1
         process_queue_mock = Mock()
         process_queue_mock.empty.return_value = True
         client.process_queue = process_queue_mock
