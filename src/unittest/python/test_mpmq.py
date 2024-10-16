@@ -91,17 +91,18 @@ class TestMPmq(unittest.TestCase):
 
         function_mock = Mock(__name__='mockfunc')
         process_data = [{'range': '0-1'}, {'range': '2-3'}, {'range': '4-5'}]
-        client = MPmq(function=function_mock, process_data=process_data, shared_data='--shared-data--')
+        client = MPmq(function=function_mock, process_data=process_data, shared_data={'key1': 'value1', 'key2': 'value2'})
         client.populate_process_queue()
         client.start_next_process()
-
         process_patch.assert_called_once_with(
             target=queue_handler_mock.return_value,
-            args=({'range': '0-1'}, '--shared-data--'),
             kwargs={
                 'message_queue': client.message_queue,
                 'offset': 0,
-                'result_queue': client.result_queue
+                'result_queue': client.result_queue,
+                'range': '0-1',
+                'key1': 'value1',
+                'key2': 'value2'
             })
         on_start_process_patch.assert_called_once_with()
 
