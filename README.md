@@ -4,7 +4,7 @@
 [![coverage](https://img.shields.io/badge/coverage-99%25-brightgreen)](https://pybuilder.io/)
 [![complexity](https://img.shields.io/badge/complexity-A-brightgreen)](https://radon.readthedocs.io/en/latest/api.html#module-radon.complexity)
 [![PyPI version](https://badge.fury.io/py/mpmq.svg)](https://badge.fury.io/py/mpmq)
-[![python](https://img.shields.io/badge/python-3.7%20%7C%203.8%20%7C%203.9%20%7C%203.10-teal)](https://www.python.org/downloads/)
+[![python](https://img.shields.io/badge/python-3.9%20%7C%203.10%20%7C%203.11%20%7C%203.12-teal)](https://www.python.org/downloads/)
 
 The mpmq module provides a convenient way to scale execution of a function across multiple input values by distributing the input across a specified number of background processes. It also provides the means for the caller to intercept and process messages from the background processes while they execute the function. It does this by configuring a custom log handler that sends the function's log messages to a thread-safe queue; several API's are provided for the caller to process the messages from the message queue. The number of processes along with the input data for each process is specified as a list of dictionaries. The number of elements in the list dictates the total number of processes to execute. The result of each function is returned as a list to the caller after all background workers complete.
 
@@ -28,9 +28,9 @@ mpmq.MPmq(function, process_data=None, shared_data=None, processes_to_start=None
 ```
 > `function` - the function to execute
 
-> `process_data` - list of dictionaries where each dictionary describes the input data that will be sent to each background process executing the function; the length of the list dictates the total number of processes that will be executed
+> `process_data` - list of dictionaries where each dictionary contains the key word arguments that will be sent to each background process executing the function; the length of the list dictates the total number of processes that will be executed
 
-> `shared_data` - a dictionary containing arbitrary data that will be sent to all processes
+> `shared_data` - a dictionary containing arbitrary data that will be sent to all processes as key word arguments
 
 > `process_to_start` - the number of processes to initially start; this represents the number of concurrent processes that will be running. If the total number of processes is greater than this 
 number then execution will be queued and executed to ensure that this concurrency is maintained
@@ -51,46 +51,46 @@ import sys, logging
 logger = logging.getLogger(__name__)
 logging.basicConfig(stream=sys.stdout, level=logging.INFO, format="%(processName)s [%(funcName)s] %(levelname)s %(message)s")
 
-def do_work(*args):
-    logger.info(f"hello from process: {args[0]['pid']}")
-    return 10 + int(args[0]['pid'])
+def do_work(pid=None, number=None):
+    logger.info(f"hello from process: {pid}")
+    return number + int(pid)
 
 process_data = [{'pid': item} for item in range(3)]
-results = MPmq(function=do_work, process_data=process_data).execute()
-print(f"Total items processed {sum([result for result in results])}")
+results = MPmq(function=do_work, process_data=process_data, shared_data={'number': 10}).execute()
+print(f"Results: {', '.join(str(num) for num in results)}")
  ```
 
 Executing the code above results in the following (for conciseness only INFO level messages are shown):
 
 ```Python
-MainProcess [start_next_process] INFO started background process at offset:0 with id:4430 name:Process-1
+MainProcess [start_next_process] INFO started background process at offset:0 with id:862 name:Process-1
 Process-1 [do_work] INFO hello from process: 0
-MainProcess [start_next_process] INFO started background process at offset:1 with id:4431 name:Process-2
-Process-1 [_queue_handler] DEBUG adding 'do_work' offset:0 result to result queue
-Process-2 [do_work] INFO hello from process: 1
-MainProcess [start_next_process] INFO started background process at offset:2 with id:4433 name:Process-3
+MainProcess [start_next_process] INFO started background process at offset:1 with id:863 name:Process-2
+MainProcess [start_next_process] INFO started background process at offset:2 with id:865 name:Process-3
 MainProcess [start_processes] INFO started 3 background processes
-Process-3 [do_work] INFO hello from process: 2
+Process-2 [do_work] INFO hello from process: 1
 Process-2 [_queue_handler] DEBUG adding 'do_work' offset:1 result to result queue
-Process-1 [_queue_handler] DEBUG execution of do_work offset:0 ended
-Process-3 [_queue_handler] DEBUG adding 'do_work' offset:2 result to result queue
-Process-1 [_queue_handler] DEBUG DONE
-MainProcess [complete_process] INFO process at offset:0 id:4430 name:Process-1 has completed
+Process-3 [do_work] INFO hello from process: 2
 Process-2 [_queue_handler] DEBUG execution of do_work offset:1 ended
 Process-2 [_queue_handler] DEBUG DONE
-MainProcess [complete_process] INFO joining process at offset:0 with id:4430 name:Process-1
+Process-3 [_queue_handler] DEBUG adding 'do_work' offset:2 result to result queue
+MainProcess [complete_process] INFO process at offset:1 id:863 name:Process-2 has completed
 Process-3 [_queue_handler] DEBUG execution of do_work offset:2 ended
 Process-3 [_queue_handler] DEBUG DONE
+Process-1 [_queue_handler] DEBUG adding 'do_work' offset:0 result to result queue
+Process-1 [_queue_handler] DEBUG execution of do_work offset:0 ended
+Process-1 [_queue_handler] DEBUG DONE
+MainProcess [complete_process] INFO joining process at offset:1 with id:863 name:Process-2
 MainProcess [process_control_message] INFO the to process queue is empty
-MainProcess [complete_process] INFO process at offset:1 id:4431 name:Process-2 has completed
-MainProcess [complete_process] INFO joining process at offset:1 with id:4431 name:Process-2
+MainProcess [complete_process] INFO process at offset:2 id:865 name:Process-3 has completed
+MainProcess [complete_process] INFO joining process at offset:2 with id:865 name:Process-3
 MainProcess [process_control_message] INFO the to process queue is empty
-MainProcess [complete_process] INFO process at offset:2 id:4433 name:Process-3 has completed
-MainProcess [complete_process] INFO joining process at offset:2 with id:4433 name:Process-3
+MainProcess [complete_process] INFO process at offset:0 id:862 name:Process-1 has completed
+MainProcess [complete_process] INFO joining process at offset:0 with id:862 name:Process-1
 MainProcess [process_control_message] INFO the to process queue is empty
 MainProcess [run] INFO there are no more active processses - quitting
->>> print(f"Total items processed {sum([result for result in results])}")
-Total items processed 33
+>>> print(f"Results: {', '.join(str(num) for num in results)}")
+Results: 10, 11, 12
 ```
 
 ### Projects using `mpmq`

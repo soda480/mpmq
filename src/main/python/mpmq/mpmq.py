@@ -93,13 +93,16 @@ class MPmq():
         """ start next process in the process queue
         """
         (offset, process_data) = self.process_queue.get()
+        kwargs = {
+            'message_queue': self.message_queue,
+            'offset': offset,
+            'result_queue': self.result_queue
+        }
+        kwargs.update(**process_data)
+        kwargs.update(**self.shared_data)
         process = Process(
             target=self.function,
-            args=(process_data, self.shared_data),
-            kwargs={
-                'message_queue': self.message_queue,
-                'offset': offset,
-                'result_queue': self.result_queue})
+            kwargs=kwargs)
         process.start()
         logger.info(f'started background process at offset:{offset} with id:{process.pid} name:{process.name}')
         # update processes dictionary with process meta-data for the process at offset
