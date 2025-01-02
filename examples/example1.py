@@ -25,6 +25,17 @@ def do_something(uuid=None, lower=None, upper=None):
         sleep(.001)
     return total
 
+def do_something2(*args):
+    uuid = args[0]['uuid']
+    shared_data = args[1]
+    logger.debug(f'processor id {uuid}')
+    total = randint(shared_data['lower'], shared_data['upper'])
+    logger.debug(f'{uuid} processing total of {total}')
+    for index in range(total):
+        logger.debug(f'{uuid} processed {index}')
+        sleep(.001)
+    return total
+
 def main():
     logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
     process_data = get_process_data(5)
