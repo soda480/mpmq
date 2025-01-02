@@ -194,16 +194,21 @@ class MPmq():
         """
         message = self.message_queue.get(False)
         match = re.match(r'^#(?P<offset>\d+)-(?P<control>DONE|ERROR)$', message)
-        offset = None
-        control = None
         if match:
-            offset = int(match.group('offset'))
-            control = match.group('control')
-        return {
-            'offset': offset,
-            'control': control,
-            'message': message
-        }
+            return {
+                'offset': int(match.group('offset')),
+                'control': match.group('control'),
+                'message': message
+            }
+
+        match = re.match(r'^#(?P<offset>\d+)-(?P<message>.*)$', message)
+        if match:
+            return {
+                'offset': int(match.group('offset')),
+                'control': None,
+                'message': match.group('message')
+            }
+        raise ValueError(f'message {message} is not formatted correctly')
 
     def process_control_message(self, offset, control):
         """ process control message
