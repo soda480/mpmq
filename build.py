@@ -28,9 +28,9 @@ use_plugin('pypi:pybuilder_anybadge')
 
 name = 'mpmq'
 authors = [Author('Emilio Reyes', 'soda480@gmail.com')]
-summary = 'Mpmq is an abstraction of the Python multiprocessing library providing execution pooling and message queuing capabilities.'
+summary = 'The mpmq module enables seamless interprocess communication between a parent and child processes when parallelizing a task across multiple workers.'
 url = 'https://github.com/soda480/mpmq'
-version = '0.5.1'
+version = '0.6.0'
 default_task = [
     'clean',
     'analyze',
