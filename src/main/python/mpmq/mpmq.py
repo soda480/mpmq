@@ -18,6 +18,7 @@ import sys
 import logging
 import datetime
 from time import sleep
+from inspect import signature
 from multiprocessing import Queue
 from multiprocessing import Process
 from queue import Queue as SimpleQueue
@@ -51,6 +52,7 @@ class MPmq():
         """
         logger.debug('executing MPmq constructor')
         self.function = QueueHandlerDecorator(function)
+        self._function = function
         self.process_data = [{}] if process_data is None else process_data
         self.shared_data = {} if shared_data is None else shared_data
         self.processes = {}
@@ -98,11 +100,20 @@ class MPmq():
             'offset': offset,
             'result_queue': self.result_queue
         }
-        kwargs.update(**process_data)
-        kwargs.update(**self.shared_data)
-        process = Process(
-            target=self.function,
-            kwargs=kwargs)
+        # if all function parameters have defaults or are variable keywords then
+        # pass process_data and shared_data as key word arguments to the function
+        # this ensures backwards compatability for older versions of mpmq
+        function_signature = signature(self._function)
+        use_kwargs = all(
+            (parameter.default != parameter.empty) or (parameter.kind == parameter.VAR_KEYWORD)
+            for parameter in function_signature.parameters.values())
+        args = ()
+        if use_kwargs:
+            kwargs.update(**process_data)
+            kwargs.update(**self.shared_data)
+        else:
+            args = (process_data, self.shared_data)
+        process = Process(target=self.function, args=args, kwargs=kwargs)
         process.start()
         logger.info(f'started background process at offset:{offset} with id:{process.pid} name:{process.name}')
         # update processes dictionary with process meta-data for the process at offset
@@ -183,16 +194,21 @@ class MPmq():
         """
         message = self.message_queue.get(False)
         match = re.match(r'^#(?P<offset>\d+)-(?P<control>DONE|ERROR)$', message)
-        offset = None
-        control = None
         if match:
-            offset = int(match.group('offset'))
-            control = match.group('control')
-        return {
-            'offset': offset,
-            'control': control,
-            'message': message
-        }
+            return {
+                'offset': int(match.group('offset')),
+                'control': match.group('control'),
+                'message': message
+            }
+
+        match = re.match(r'^#(?P<offset>\d+)-(?P<message>.*)$', message)
+        if match:
+            return {
+                'offset': int(match.group('offset')),
+                'control': None,
+                'message': match.group('message')
+            }
+        raise ValueError(f'message {message} is not formatted correctly')
 
     def process_control_message(self, offset, control):
         """ process control message

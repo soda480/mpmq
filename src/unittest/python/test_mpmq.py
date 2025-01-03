@@ -89,13 +89,15 @@ class TestMPmq(unittest.TestCase):
         process_mock = Mock()
         process_patch.return_value = process_mock
 
-        function_mock = Mock(__name__='mockfunc')
+        def function_mock(range=None, key1=None, key2=None):
+            pass
         process_data = [{'range': '0-1'}, {'range': '2-3'}, {'range': '4-5'}]
         client = MPmq(function=function_mock, process_data=process_data, shared_data={'key1': 'value1', 'key2': 'value2'})
         client.populate_process_queue()
         client.start_next_process()
         process_patch.assert_called_once_with(
             target=queue_handler_mock.return_value,
+            args=(),
             kwargs={
                 'message_queue': client.message_queue,
                 'offset': 0,
@@ -103,6 +105,30 @@ class TestMPmq(unittest.TestCase):
                 'range': '0-1',
                 'key1': 'value1',
                 'key2': 'value2'
+            })
+        on_start_process_patch.assert_called_once_with()
+
+    @patch('mpmq.MPmq.on_start_process')
+    @patch('mpmq.mpmq.QueueHandlerDecorator')
+    @patch('mpmq.mpmq.Process')
+    def test__start_next_process_Should_CallExpected_When_FunctionArgs(self, process_patch, queue_handler_mock, on_start_process_patch, *patches):
+        process_mock = Mock()
+        process_patch.return_value = process_mock
+
+        def function_mock(process_data, shared_data):
+            pass
+        process_data = [{'range': '0-1'}, {'range': '2-3'}, {'range': '4-5'}]
+        shared_data = {'key1': 'value1', 'key2': 'value2'}
+        client = MPmq(function=function_mock, process_data=process_data, shared_data=shared_data)
+        client.populate_process_queue()
+        client.start_next_process()
+        process_patch.assert_called_once_with(
+            target=queue_handler_mock.return_value,
+            args=({'range': '0-1'}, shared_data),
+            kwargs={
+                'message_queue': client.message_queue,
+                'offset': 0,
+                'result_queue': client.result_queue
             })
         on_start_process_patch.assert_called_once_with()
 
@@ -197,11 +223,21 @@ class TestMPmq(unittest.TestCase):
 
         result = client.get_message()
         expected_result = {
-            'offset': None,
+            'offset': 4,
             'control': None,
-            'message': '#4-This is a log message'
+            'message': 'This is a log message'
         }
         self.assertEqual(result, expected_result)
+
+    def test__get_message_Should_RaiseValueError_When_Malformed(self, *patches):
+        process_data = [{'range': '0-1'}]
+        client = MPmq(function=Mock(__name__='mockfunc'), process_data=process_data)
+
+        message_queue_mock = Mock()
+        message_queue_mock.get.return_value = '#-This is a log message'
+        client.message_queue = message_queue_mock
+        with self.assertRaises(ValueError):
+            client.get_message()
 
     @patch('mpmq.MPmq.complete_process')
     def test__process_control_message_Should_RaiseNoActiveProcesses_When_ControlDoneAndProcessQueueEmptyAndNoActiveProcesses(self, *patches):
