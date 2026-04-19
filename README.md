@@ -1,56 +1,96 @@
-# mpmq
-[![GitHub Workflow Status](https://github.com/soda480/mpmq/workflows/build/badge.svg)](https://github.com/soda480/mpmq/actions)
-[![vulnerabilities](https://img.shields.io/badge/vulnerabilities-None-brightgreen)](https://pypi.org/project/bandit/)
-[![coverage](https://img.shields.io/badge/coverage-99%25-brightgreen)](https://pybuilder.io/)
-[![complexity](https://img.shields.io/badge/complexity-A-brightgreen)](https://radon.readthedocs.io/en/latest/api.html#module-radon.complexity)
+[![ci](https://github.com/soda480/mpmq/actions/workflows/ci.yml/badge.svg)](https://github.com/soda480/mpmq/actions/workflows/ci.yml)
+![Coverage](https://raw.githubusercontent.com/soda480/mpmq/main/docs/badges/coverage.svg)
 [![PyPI version](https://badge.fury.io/py/mpmq.svg)](https://badge.fury.io/py/mpmq)
-[![python](https://img.shields.io/badge/python-3.9%20%7C%203.10%20%7C%203.11%20%7C%203.12-teal)](https://www.python.org/downloads/)
 
-The mpmq module enables seamless interprocess communication between a parent and child processes when parallelizing a task across multiple workers. The `MPmq` class defines a custom log handler that sends all log messages from child workers to a thread-safe queue that the parent can consume and handle. This is helpful in cases where you want the parent to show real-time progress of child workers as they execute a task.
+# mpmq
 
-### Installation
+`mpmq` is a Python package for running the same function across multiple processes while capturing worker log messages in a central message queue. It is built for programs that need controlled parallel execution, per-worker inputs, and a clean way to observe what workers are doing while they run.
+
+## Why use `mpmq`
+
+Raw `multiprocessing` gives you processes, but you still end up writing glue code for:
+
+- feeding each worker input
+- limiting concurrency
+- collecting results
+- handling worker logs
+
+`mpmq` handles that for you with a simple, consistent execution model.
+
+## What `mpmq` does
+
+`mpmq` runs a function across multiple processes, passing each worker its own input and optionally shared data. Worker log messages are routed back to the parent process through a queue, and results are collected when execution completes. You define the work and inputs. `mpmq` handles process management, concurrency, message forwarding, and result collection.
+
+mpmq is a lightweight wrapper around Python multiprocessing that lets you run a function across multiple processes, centralize worker log messages, and collect results — without writing the plumbing yourself.
+
+## Installation
+
 ```bash
 pip install mpmq
 ```
 
-### `MPmq class`
+## `MPmq class`
+
 ```
 mpmq.MPmq(function, process_data=None, shared_data=None, processes_to_start=None)
 ```
-> `function` - the function represents the task you wish the child workers to execute
 
-> `process_data` - list of dictionaries where each dictionary contains the arguments that will be sent to each background child process executing the function; the length of the list dictates the total number of processes that will be executed
+### Parameters
 
-> `shared_data` - a dictionary containing arbitrary data that will be sent to all processes as key word arguments
+#### `function`
 
-> `process_to_start` - the number of processes to initially start; this represents the number of concurrent processes that will be running. If the total number of processes is greater than this 
-number then execution will be queued and executed to ensure that this concurrency is maintained
+Function executed in each worker process.
 
-> **execute(raise_if_error=False)**
->> Start execution the process’s activity. If `raise_if_error` is set to True, an exception will be raised if any function encountered an error during execution.
+#### `process_data`
 
-> **process_message(offset, message)**
->> Process a message sent from one of the background workers executing the function. The `offset` represents the index of the executing Process; this number is the same as the corresponding index within the `process_data` list that was sent to the constructor. The `message` represents the message that was logged by the function. 
+List of dictionaries. Each dictionary is passed to one worker. Total length = total executions.
 
-### Examples
+#### `shared_data`
 
- The primary intent is for the MPmq class to be used as a superclass where the subclass ovverrides the `process_message` method to handle messages coming in from the child workers. The following example demonstrate how this can be done.
+Dictionary passed to all workers.
 
-#### [Worker Status as a Progress Bar](https://github.com/soda480/mpmq/blob/main/examples/example1.py)
+#### `process_to_start`
+
+Max number of concurrent workers. Extra work is queued and executed as workers complete.
+
+### Methods
+
+#### `execute(raise_if_error=False)`
+
+Starts execution and waits for all workers to complete.
+
+Returns a list of results from each worker.
+
+If `raise_if_error=True`, raises an exception if any worker fails.
+
+#### `process_message(offset, message)`
+
+Hook for handling log messages from workers while execution is running.
+
+* `offset` - index of worker in `process_data`
+* `message` - logged message
+
+This is the key extension point for building tools like progress displays or terminal UIs.
+
+## Examples
+
+The `MPmq` class is designed to be subclassed. By overriding `process_message`, you can handle log messages from worker processes as they are received. The example below shows how to do this.
+
+### [Worker Status as a Progress Bar](https://github.com/soda480/mpmq/blob/main/docs/examples/example1.py)
 
 The example parallizezes a task across multiple processes using a pool of worker processes. Status of each worker is shown as a Progress Bar, as each Child worker in the pool completes an item defined in the task the Parent updates a Progress Bar.
 
 ![example](https://raw.githubusercontent.com/soda480/mpmq/main/docs/images/example1.gif)
 
 
-#### [Worker Status as a List](https://github.com/soda480/mpmq/blob/main/examples/example2.py)
+### [Worker Status as a List](https://github.com/soda480/mpmq/blob/main/docs/examples/example2.py)
 
 The example parallizezes a task across multiple processes using a pool of worker processes. Status of each worker is shown using an array where each index of the array represents an individual worker, as each Child worker in the pool completes the associated item in the List is updated with the completed message.
 
 ![example](https://raw.githubusercontent.com/soda480/mpmq/main/docs/images/example2.gif)
 
 
-### Projects using `mpmq`
+## Projects using `mpmq`
 
 * [`mpcurses`](https://pypi.org/project/mpcurses/) An abstraction of the Python curses and multiprocessing libraries providing function execution and runtime visualization capabilities
 
@@ -58,7 +98,7 @@ The example parallizezes a task across multiple processes using a pool of worker
 
 * [`mp4ansi`](https://pypi.org/project/mp4ansi/) A simple ANSI-based terminal emulator that provides multi-processing capabilities
 
-### Development
+## Development
 
 Clone the repository and ensure the latest version of Docker is installed on your development server.
 
@@ -80,5 +120,5 @@ bash
 
 Execute the build:
 ```sh
-pyb -X
+make dev
 ```

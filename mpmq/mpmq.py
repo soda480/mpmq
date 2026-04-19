@@ -17,14 +17,13 @@ import re
 import sys
 import logging
 import datetime
-from time import sleep
 from inspect import signature
 from multiprocessing import Queue
 from multiprocessing import Process
 from queue import Queue as SimpleQueue
 from queue import Empty
 
-from mpmq.handler import QueueHandlerDecorator
+from .handler import QueueHandlerDecorator
 
 logger = logging.getLogger(__name__)
 
